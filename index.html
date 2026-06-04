@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Локальный планировщик задач</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="view-switch" aria-label="Переключатель режима">
+        <button class="switch-button" type="button" data-view="day">День</button>
+        <button class="switch-button" type="button" data-view="week">Неделя</button>
+        <button class="switch-button" type="button" data-view="month">Месяц</button>
+      </div>
+
+      <nav class="date-controls" aria-label="Навигация по датам">
+        <button class="icon-button" type="button" id="prevButton" aria-label="Назад">Назад</button>
+        <button class="icon-button" type="button" id="nextButton" aria-label="Вперед">Вперед</button>
+        <button class="today-button" type="button" id="todayButton">Сегодня</button>
+      </nav>
+
+      <h1 class="period-title" id="periodTitle"></h1>
+
+      <div class="backup-controls" aria-label="Экспорт и импорт">
+        <button class="backup-button theme-button" type="button" id="themeToggleButton" aria-label="Переключить тему">🌙</button>
+        <button class="backup-button" type="button" id="exportButton">экспорт</button>
+        <button class="backup-button" type="button" id="importButton">импорт</button>
+        <input type="file" id="importFileInput" accept="application/json,.json" hidden>
+      </div>
+
+      <button class="new-task-button" type="button" id="newTaskButton">+ новая задача</button>
+
+      <p class="storage-warning">данные хранятся только в этом браузере. для защиты от потери данных используйте экспорт</p>
+      <p class="app-notice" id="appNotice" role="status" aria-live="polite" hidden></p>
+    </header>
+
+    <main class="planner-shell">
+      <section class="planner-grid" id="plannerGrid" aria-live="polite"></section>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="taskModal" hidden>
+    <section class="task-modal" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
+      <header class="modal-header">
+        <h2 id="taskModalTitle">Новая задача</h2>
+        <button class="close-button" type="button" id="closeModalButton" aria-label="Закрыть">×</button>
+      </header>
+
+      <form class="task-form" id="taskForm" novalidate>
+        <input type="hidden" id="taskId">
+
+        <label class="field">
+          <span>Название</span>
+          <input type="text" id="taskTitle" placeholder="Например, подготовить отчет" autocomplete="off" required>
+        </label>
+
+        <label class="field">
+          <span>Дата</span>
+          <input type="date" id="taskDate" required>
+        </label>
+
+        <label class="field">
+          <span>Приоритет</span>
+          <select id="taskPriority">
+            <option value="low">low</option>
+            <option value="medium" selected>medium</option>
+            <option value="high">high</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Вид задачи</span>
+          <select id="taskType">
+            <option value="personal">личная</option>
+            <option value="work">рабочая</option>
+            <option value="other" selected>прочая</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Комментарий</span>
+          <textarea id="taskComment" rows="4" placeholder="Детали, контекст или заметки"></textarea>
+        </label>
+
+        <section class="subtasks-editor" aria-label="Чек-лист">
+          <div class="subtasks-editor-header">
+            <span>Чек-лист</span>
+            <button class="add-subtask-button" type="button" id="addSubtaskButton">+ пункт</button>
+          </div>
+          <div class="subtask-fields" id="subtaskFields"></div>
+        </section>
+
+        <p class="form-error" id="formError" aria-live="polite"></p>
+
+        <footer class="modal-actions">
+          <button class="delete-task-button" type="button" id="modalDeleteButton" hidden>Удалить</button>
+          <button class="secondary-button" type="button" id="cancelModalButton">Отмена</button>
+          <button class="save-task-button" type="submit">Сохранить</button>
+        </footer>
+      </form>
+    </section>
+  </div>
+
+  <div class="modal-overlay" id="moveModal" hidden>
+    <section class="move-modal" role="dialog" aria-modal="true" aria-labelledby="moveModalTitle">
+      <header class="modal-header">
+        <h2 id="moveModalTitle">Перенести задачу</h2>
+        <button class="close-button" type="button" id="closeMoveModalButton" aria-label="Закрыть">×</button>
+      </header>
+
+      <form class="task-form" id="moveForm">
+        <label class="field">
+          <span>Куда перенести</span>
+          <input type="date" id="moveDateInput" required>
+        </label>
+
+        <p class="move-target" id="moveTargetLabel"></p>
+
+        <label class="field">
+          <span>Задача</span>
+          <select id="moveTaskSelect" required></select>
+        </label>
+
+        <footer class="modal-actions">
+          <button class="secondary-button" type="button" id="cancelMoveButton">Отмена</button>
+          <button class="save-task-button" type="submit">Перенести</button>
+        </footer>
+      </form>
+    </section>
+  </div>
+
+  <div class="modal-overlay" id="filterModal" hidden>
+    <section class="move-modal" role="dialog" aria-modal="true" aria-labelledby="filterModalTitle">
+      <header class="modal-header">
+        <h2 id="filterModalTitle">Фильтр и сортировка</h2>
+        <button class="close-button" type="button" id="closeFilterModalButton" aria-label="Закрыть">×</button>
+      </header>
+
+      <form class="task-form" id="filterForm">
+        <label class="field">
+          <span>Приоритет</span>
+          <select id="filterPriority">
+            <option value="all">любой</option>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Вид</span>
+          <select id="filterType">
+            <option value="all">любой</option>
+            <option value="personal">личная</option>
+            <option value="work">рабочая</option>
+            <option value="other">прочая</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Статус</span>
+          <select id="filterStatus">
+            <option value="all">любой</option>
+            <option value="active">только активные</option>
+            <option value="completed">только выполненные</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Сортировка</span>
+          <select id="sortTasks">
+            <option value="manual">мой порядок</option>
+            <option value="priority-desc">сначала высокий приоритет</option>
+            <option value="priority-asc">сначала низкий приоритет</option>
+            <option value="title">по названию</option>
+            <option value="created-desc">сначала новые</option>
+          </select>
+        </label>
+
+        <footer class="modal-actions">
+          <button class="secondary-button" type="button" id="resetFiltersButton">Сбросить</button>
+          <button class="save-task-button" type="submit">Применить</button>
+        </footer>
+      </form>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
